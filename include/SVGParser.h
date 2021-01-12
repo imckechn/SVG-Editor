@@ -2,11 +2,13 @@
 #define SVGPARSER_H
 
 #include <stdio.h>
+
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/encoding.h>
 #include <libxml/xmlwriter.h>
 #include <libxml/xmlschemastypes.h>
+
 #include "LinkedListAPI.h"
 
 typedef enum COMP{
@@ -413,5 +415,29 @@ int compareCircles(const void *first, const void *second);
 void deletePath(void* data);
 char* pathToString(void* data);
 int comparePaths(const void *first, const void *second);
+
+
+//General Functions built after A3 was completed
+int getAllRects(SVGimage* img);
+int getAllCircles(SVGimage* img);
+int getAllPaths(SVGimage* img);
+int getAllGroups(SVGimage* img);
+int getSubGroups(Group *g);
+
+char* getAllRectsJSON(SVGimage* img);
+char* getAllCirclesJSON(SVGimage* img);
+
+char *wholeSVGtoJSON(SVGimage *img);
+
+//This returns both the circles and rects as a single json Object
+SVGimage* wholeJSONtoSVG(char *json, char *namespace, char *title, char *desc );
+char* getNameSpace(SVGimage *img);
+char* getTitle(SVGimage *img);
+char* getDesc(SVGimage *img);
+
+//Get all the paths in json so the user can view them
+char* getPathsToJSON(SVGimage *img);
+SVGimage* initializeSvgImage();
+
 
 #endif
