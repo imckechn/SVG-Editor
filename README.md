@@ -8,5 +8,5 @@ This is program allows the user to: edit, create, delete, view rectangles and ci
 
 To run!
 type:
-$ make
-$ python3 src/main.py
+- $ make
+- $ python3 src/main.py
