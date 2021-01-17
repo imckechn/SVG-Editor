@@ -1,4 +1,4 @@
-.MetaData.txt
+MetaData.txt
 *.o
 *.so
-/.vscode
+.vscode
