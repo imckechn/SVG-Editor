@@ -1,3 +1,12 @@
 This is a svg editor program.
 
-It was made for a class at The University of Guelph. We made a library that a GUI could access. This GUI would allow the user to upload a SVG file which this library would check to make sure it's valid. Then the library would find all the elements in the file (lines, circles, squares...etc) and show them to the user with all the attributes attached to them. Then the user could add or delete elements to the svg file and have it saved and sent back the user through the GUI.
+This program has two parts. A Python interface and C Dynamic Library. The user runs the python project to run the program.
+
+This program uses the libsxm2 library by GNOME (it's already inside the project) as well as the c linked list API by 'CIS*2750 S18 (based on the ListADT from CIS*2520, S17)'
+
+This is program allows the user to: edit, create, delete, view rectangles and circles in an SVG image file. You can bring your own svg files by having them in the svgs directory or you can make your own through the program. The program will validate each file before running. All the edits and changes are tracked in a metaData file in JSON format which allows this to operater as a svg image repository.
+
+To run!
+type:
+$ make
+$ python3 src/main.py
