@@ -3297,7 +3297,7 @@ Circle* JSONtoCircle(char* svgString) {
 
     //Find r
     charStart = strchr(svgString + cursor, ':');  //+1 for the colon
-    start = charStart - svgString;
+    start = 2 + charStart - svgString;
     charEnd = strchr(svgString + start, ',');    //-1 for the comma 
     end = charEnd - svgString;
     strncpy(subStr, svgString + start, end - start);
@@ -3326,13 +3326,6 @@ Circle* JSONtoCircle(char* svgString) {
 
 SVGimage* wholeJSONtoSVG(SVGimage *img, char *json, char *namespace, char *title, char *desc ) {
 
-    //printf("Strlen(json) = %d\n", strlen(json));
-    /*printf("json = %s\n", json);
-    printf("ns = %s\n", namespace);
-    printf("title = %s\n", title);
-    printf("desc = %s\n", desc);
-    */
-    
     //Format img
     freeList(img->rectangles);
     freeList(img->circles);
@@ -3417,8 +3410,6 @@ SVGimage* wholeJSONtoSVG(SVGimage *img, char *json, char *namespace, char *title
                     memcpy( newCircle, json + startIndex, 1 + currentIndex - startIndex);
                     newCircle[1 + currentIndex - startIndex] = '\0';
 
-                    //printf("------------------Circle will be %s\n", newCircle);
-
                     Circle *circle = JSONtoCircle(newCircle);
 
                     //printf("before circle insert\n");
@@ -3430,9 +3421,7 @@ SVGimage* wholeJSONtoSVG(SVGimage *img, char *json, char *namespace, char *title
             currentIndex++;
         }
     }
-    
-    //printf("OUTSIDE\n");
-    ///("C\n");
+
     return img;
 }
 

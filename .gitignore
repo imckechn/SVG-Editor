@@ -1,1 +1,4 @@
 .MetaData.txt
+*.o
+*.so
+/.vscode

@@ -77,10 +77,10 @@ def createRectangle(libc, img, imgJSON, metaData):
     
     units = ''
     while (True): 
-        print("What units (px, mm, cm, in)")
+        print("What units (px, mm, cm, in, or enter for the default)")
         units = input()
 
-        if ( units.lower() == "mm" or units.lower() == 'in' or units.lower() == 'cm' or units.lower() == 'px' ):
+        if ( units == "" or units.lower() == "mm" or units.lower() == 'in' or units.lower() == 'cm' or units.lower() == 'px' ):
             break
         print('units = ' + units)
 
@@ -139,12 +139,9 @@ def createRectangle(libc, img, imgJSON, metaData):
         rect["attributes"].append(attributeThree)
 
     #add the rect JSON to imgJSON
-    print("before = " + str(imgJSON[1]))
     imgJSON[1].append(rect)
-    print("After = " + str(imgJSON[1]))
     updateMetaDataCreate(metaData, "rectangle")
 
-    
     print('Rectangle complete')
 
     return imgJSON
@@ -246,7 +243,6 @@ def createCircle(libc, img, imgJSON, metaData):
         circle["attributes"].append(attributeThree)
 
     #add the circle JSON to imgJSON
-    print('Circle being created = ' + str(circle))
     imgJSON[3].append(circle)
     updateMetaDataCreate(metaData, "circle")
     print('Circle complete')
@@ -597,6 +593,9 @@ def viewCircles(libc, img, imgJSON):
 
 
 def checkName(name):
+    if len(name) == 0:
+        return False
+
     if '0' in name:
         return False
     elif '1' in name:
@@ -890,12 +889,10 @@ def updateMetaDataCreate(metaData, shape):
 
     
 def updateMetaDataEdit(metaData, shape, index, value):
-    print("spot = " + str(metaData) + "\n\n")
     metaData["data"][str(indexOfShape)]['data'][shape + "s"][index].append({datetime.now().strftime("%d/%m/%Y|%H:%M:%S"): value })
     
 
 def updateMetaDataDelete(metaData, shape, index, data):
-    print("metaData = " + str(metaData))
     #create the obj
     deletedData = {}
     deletedData["finalShape"] =  data
@@ -1055,6 +1052,8 @@ while (True):
         #print("ns = " + str(c_char_p(ns).value))
         #print("title = " + str(title))
         #print("desc = " + str(desc))
+
+        #print("THE IMAGE BEFORE = " + str(imgJSON) + "\n\n")
 
         stringImgJSON = str(imgJSON)
         stringImgJSON = c_char_p(stringImgJSON.encode('utf-8'))
