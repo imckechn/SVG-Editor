@@ -383,7 +383,7 @@ SVGimage* JSONtoSVG(const char* svgString);
 *@return A newly allocated and initialized Rectangle struct
 *@param str - a pointer to a string
 **/
-Rectangle* JSONtoRect(const char* svgString);
+Rectangle* JSONtoRect(char* svgString);
 
 /** Function to converting a JSON string into a Circle struct
 *@pre JSON string is not NULL
@@ -391,7 +391,7 @@ Rectangle* JSONtoRect(const char* svgString);
 *@return A newly allocated and initialized Circle struct
 *@param str - a pointer to a string
 **/
-Circle* JSONtoCircle(const char* svgString);
+Circle* JSONtoCircle(char* svgString);
 
 
 /* ******************************* List helper functions  - MUST be implemented *************************** */
@@ -430,7 +430,7 @@ char* getAllCirclesJSON(SVGimage* img);
 char *wholeSVGtoJSON(SVGimage *img);
 
 //This returns both the circles and rects as a single json Object
-SVGimage* wholeJSONtoSVG(char *json, char *namespace, char *title, char *desc );
+SVGimage* wholeJSONtoSVG(SVGimage *img, char *json, char *namespace, char *title, char *desc );
 char* getNameSpace(SVGimage *img);
 char* getTitle(SVGimage *img);
 char* getDesc(SVGimage *img);
@@ -438,6 +438,7 @@ char* getDesc(SVGimage *img);
 //Get all the paths in json so the user can view them
 char* getPathsToJSON(SVGimage *img);
 SVGimage* initializeSvgImage();
+void addAtributes( List *attributes, char *json);
 
 
 #endif

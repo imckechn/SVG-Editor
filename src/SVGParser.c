@@ -107,7 +107,9 @@ bool checkImageAgainstSchemaFile(SVGimage *image, char *schemaFile);
 
 /*  <A2 module 2 helper functions>   */
 bool UpdateAttributes(ListIterator iter, Attribute *newAttribute, int length);
-char* formatPathData(char *data, int start);    //Actually a helper for the Shopify Code Challenge
+char* formatDataString(char *data, int start);    //Actually a helper for the Shopify Code Challenge
+char* formatAttyData(char *data, int start );   //Helps organize the atty data so it can be interpreted as a json object later
+SVGimage* wholeJSONtoSVG(SVGimage *img, char *json, char *namespace, char *title, char *desc );
 /*  </A2 module 2 helper functions>   */
 
 /*  This is the main function. Calls all the helper functions so it can take an SVG file name and return all the SVG elements and
@@ -1217,8 +1219,7 @@ char* rectangleToString(void* data) {
 
         //returnVal = realloc(returnVal, sizeof(char) * (strlen(", Units: ") + strlen(rect->units) + strlen(returnVal)));
         strcat(returnVal, ", Units: ");
-        strcat(returnVal, rect->units);
-     }
+    }
 
     //Attributes value
     //returnVal = realloc(returnVal, sizeof(char) * (strlen( toString(rect->otherAttributes)) + strlen(returnVal)));
@@ -1777,6 +1778,7 @@ xmlDocPtr imageToXmlTree(SVGimage *image) {
     iter = createIterator(image->circles);
     for (int i = 0; i < getLength(image->circles); i++) {
         Circle *circle = (Circle *) nextElement(&iter);
+
         createCircleNode(circle, root_node);
     }
 
@@ -1810,6 +1812,7 @@ void createGroupNode(Group *group, xmlNodePtr root_node) {
         xmlNewProp(node, BAD_CAST atty->name, BAD_CAST atty->value);
     }
 
+    //Problem here where it keeps adding more circles (probably rects too) to the img. Took it out for now
     //Rectangles
     iter = createIterator(group->rectangles);
     for (int i = 0; i < getLength(group->rectangles); i++) {
@@ -2512,21 +2515,37 @@ void addComponent(SVGimage* image, elementType elemType, void* newComponent) {
 char* attrToJSON(const Attribute *a) {
     if (!a) return "{}";
 
-    int combinedLenth = 22;
-
+    int combinedLenth = strlen("{\"name\":\"\",\"value\":\"\"}");
     combinedLenth += strlen(a->name);
-    combinedLenth += strlen(a->value);
+    char *value = formatAttyData(a->value, 0);
+    combinedLenth += strlen(value);
 
     char *JSONstring = malloc(sizeof(char) * combinedLenth + 1);
-
     strcpy(JSONstring, "{\"name\":\"");
     strcat(JSONstring, a->name);
     strcat(JSONstring, "\",\"value\":\"");
-    strcat(JSONstring, a->value);
+    strcat(JSONstring, value);
     strcat(JSONstring, "\"}" );
-    strcat(JSONstring, "\0");
 
     return JSONstring;
+}
+
+char* formatAttyData(char *data, int start ) {
+    int len = strlen(data);
+
+    for (int i = start; i < len; i++) {
+        if (data[i] == '"' && data[i-1] != '\\'){
+
+            char *newStr = malloc(sizeof(char) * (len + 1) );   //Copy the new string over
+            strncpy(newStr, data, i - 1);
+            strcat(newStr, "\\");
+            strcat(newStr, data + i + 1);
+            
+            if (start > 0) free(data);  //It's not the original if the start is greater than the default
+            return formatDataString(newStr, i);
+        }
+    }
+    return data;
 }
 
 char* circleToJSON(const Circle *c) {
@@ -2541,25 +2560,26 @@ char* circleToJSON(const Circle *c) {
     units = malloc(sizeof(char) * 3);
     //strcpy(units, "\0");
 
+
     //Setting the Circles attributes to strings
     sprintf(cx, "%.2lf", c->cx);
     sprintf(cy, "%.2lf", c->cy);
     sprintf(r, "%.2lf", c->r);
     sprintf(numAttr, "%d", getLength(c->otherAttributes) );
-
     strcpy(units, c->units);
 
-    int combinedLength = strlen("{\"cx\":,\"cy\":,\"r\":,\"numAttr\":,\"units\":\"\"}");
+    int combinedLength = strlen("{\"cx\":,\"cy\":,\"r\":,\"numAttr\":,\"units\":\"\",\"attributes\":}");
 
     //Getting the lengths of all the strings
     combinedLength += strlen(cx);
     combinedLength += strlen(cy);
     combinedLength += strlen(r);
     combinedLength += strlen(numAttr);
-     if ( strcmp(units, "") != 0) combinedLength += strlen(units);
+    if ( strcmp(units, "") != 0) combinedLength += strlen(units);
 
     //JSONstring = malloc(sizeof(char) * combinedLength + 1);
-    JSONstring = malloc(sizeof(char) * 1000);
+    char *attys = attrListToJSON(c->otherAttributes);
+    JSONstring = malloc(sizeof(char) * (combinedLength + strlen(attys) + 1));
 
     strcpy(JSONstring, "{\"cx\":" );
     strcat(JSONstring, cx);
@@ -2570,9 +2590,16 @@ char* circleToJSON(const Circle *c) {
     strcat(JSONstring, ",\"numAttr\":");
     strcat(JSONstring, numAttr);
     strcat(JSONstring, ",\"units\":\"");
-    if ( strcmp(c->units, "") != 0) strcat(JSONstring, units);
-    strcat(JSONstring, "\"}");
-    strcat(JSONstring, "\0");
+
+    if ( strcmp(c->units, "") != 0){
+        strcat(JSONstring, units);
+    } 
+
+    strcat(JSONstring, "\",\"attributes\":");
+    strcat(JSONstring, attys);
+    free(attys);
+
+    strcat(JSONstring, "}");
 
     free(cx);
     free(cy);
@@ -2603,13 +2630,10 @@ char* rectToJSON(const Rectangle *r) {
     sprintf(height, "%.2lf", r->height);
     sprintf(numAttr, "%d", getLength(r->otherAttributes) );
 
-    //if ( strcmp(r->units, "") != 0) {
-        //free(units);
-        //units = malloc(sizeof(char) * (strlen(r->units) + 1) );
     strcpy(units, r->units);
-    //}
+    
 
-    int combinedLength = strlen("{\"x\":,\"y\":,\"w\":,\"h\":,\"numAttr\":,\"units\":\"\"}");
+    int combinedLength = strlen("{\"x\":,\"y\":,\"w\":,\"h\":,\"numAttr\":,\"units\":\"\",\"attributes\":}");
 
     //Getting the lengths of all the strings
     combinedLength += strlen(x);
@@ -2619,7 +2643,10 @@ char* rectToJSON(const Rectangle *r) {
     combinedLength += strlen(numAttr);
     if (strcmp(units, "") != 0) combinedLength += strlen(units);
 
-    JSONstring = malloc(sizeof(char) * combinedLength + 1);
+    //The list of attributes
+    char *attys = attrListToJSON(r->otherAttributes);
+
+    JSONstring = malloc(sizeof(char) * (combinedLength + strlen(attys) + 1));
 
     strcpy(JSONstring, "{\"x\":" );
     strcat(JSONstring, x);
@@ -2633,9 +2660,14 @@ char* rectToJSON(const Rectangle *r) {
     strcat(JSONstring, numAttr);
     strcat(JSONstring, ",\"units\":\"");
 
-    if ( strcmp(r->units, "") != 0) strcat(JSONstring, units);
-    strcat(JSONstring, "\"}");
-    strcat(JSONstring, "\0");
+    if ( strcmp(r->units, "") != 0){
+        strcat(JSONstring, units);
+    }
+
+    strcat(JSONstring, "\",\"attributes\":");
+    strcat(JSONstring, attys);
+    free(attys);
+    strcat(JSONstring, "}");
 
     free(x);
     free(y);
@@ -2648,7 +2680,7 @@ char* rectToJSON(const Rectangle *r) {
 
 }
 
-char* formatPathData(char *data, int start) {
+char* formatDataString(char *data, int start) {
     int len = strlen(data);
 
     for (int i = start; i < len; i++) {
@@ -2660,10 +2692,9 @@ char* formatPathData(char *data, int start) {
             strcat(newStr, data + i + 1);
             
             if (start > 0) free(data);  //It's not the original if the start is greater than the default
-            return formatPathData(newStr, i);
+            return formatDataString(newStr, i);
         }
     }
-
     return data;
 }
 
@@ -2686,7 +2717,7 @@ char* pathToJSON(const Path *p) {
     JSONstring = malloc(sizeof(char) * combinedLength + 1);
 
     strcpy(JSONstring, "{\"d\":\"" );
-    strcat(JSONstring, formatPathData(p->data, 0));
+    strcat(JSONstring, formatDataString(p->data, 0));
     strcat(JSONstring, "\",\"numAttr\":");
     strcat(JSONstring, numAttr);
     strcat(JSONstring, "}");
@@ -2804,7 +2835,7 @@ char* attrListToJSON(const List *list) {
     ListIterator iter = createIterator( (List *) list);
 
     int length = getLength( (List *) list);
-    int size = 0;
+    int size = strlen("[]");
 
     for (int i = 0; i < length; i++) {
         Attribute *atty = nextElement(&iter);
@@ -2828,13 +2859,15 @@ char* attrListToJSON(const List *list) {
         char *temp = attrToJSON(atty);
 
         strcat(JSONstring, temp);
+        //strcat(JSONstring, ",");
 
         if (i + 1 != length) strcat(JSONstring, ",");
         free(temp);
     }
 
+    //JSONstring[strlen(JSONstring) - 1] = ']';
     strcat(JSONstring, "]");
-    strcat(JSONstring, "\0");
+    //strcat(JSONstring, "\0");
 
     return JSONstring;
 }
@@ -3066,8 +3099,7 @@ char* getAllRectsJSON(SVGimage* img) {
     Rectangle *rect;
     ListIterator iter = createIterator(list);
     int counter = 0;
-    while((rect = nextElement(&iter)) != NULL){
-        
+    while((rect = nextElement(&iter)) != NULL){        
         char *temp = rectToJSON(rect);
         //jsonStr = (char*) realloc(jsonStr, sizeof(char) * (strlen(temp) + 3));
 
@@ -3101,11 +3133,9 @@ char* getAllCirclesJSON(SVGimage* img) {
     Circle *circle;
     ListIterator iter = createIterator(list);
     int counter = 0;
-    while((circle = nextElement(&iter)) != NULL){
-        
-        char *temp = circleToJSON(circle);
 
-        //jsonStr = (char*) realloc(jsonStr, sizeof(char) * (strlen(temp) + 3));
+    while((circle = nextElement(&iter)) != NULL){
+        char *temp = circleToJSON(circle);
 
         strcat(jsonStr, temp);
         strcat(jsonStr, ",");
@@ -3150,7 +3180,7 @@ char *wholeSVGtoJSON(SVGimage *img) {
 }
 
 
-Rectangle* JSONtoRect(const char* svgString) {
+Rectangle* JSONtoRect(char* svgString) {
     Rectangle *rect = initializeRectangle();
 
     if (svgString == NULL) return rect;
@@ -3207,28 +3237,32 @@ Rectangle* JSONtoRect(const char* svgString) {
     cursor = end + 1; 
     //printf("height = %f\n", rect->height);
 
-    //Find Number of Attrbutes  -> Don't need this
-    charStart = strchr(svgString + cursor, ':');  //+1 for the colon
-    start = charStart - svgString;
-    charEnd = strchr(svgString + start + 1, ',');    //-1 for the comma 
-    end = charEnd - svgString;
-    cursor = end + 1; 
-
     //Find units
-    charStart = strchr(svgString + cursor, ':');  //+1 for the colon
-    start = charStart - svgString;
-    charEnd = strchr(svgString + start + 1, ',');    //-1 for the comma 
+    charStart = strstr(svgString + cursor, "units");  //+1 for the colon
+    //printf("Units start = %s\n", charStart);
+    start = 9 + charStart - svgString;
+    charEnd = strchr(svgString + start, '\'');    //-1 for the comma 
     end = charEnd - svgString;
-    strncpy(subStr, svgString + start + 1, end - start);
-    subStr[end - start] = '\0';
-    Attribute *atty = initializeAttribute("units", subStr);
-    insertBack(rect->otherAttributes, atty);
+    strncpy(subStr, svgString + start, end - start);
+    subStr[(end - start)] = '\0';
+    strcpy(rect->units, subStr);
+    //printf("***Rect units = %s\n", rect->units);
+    cursor = end + 1;
+    //printf("a\n");
 
+    //Prep the string to get the attributes
+    charStart = strstr(svgString + cursor, "attributes");  //+1 for the colon
+    cursor = 15 + charStart - svgString;
+
+    addAtributes(rect->otherAttributes, svgString + cursor); //+15 for the length of attributes:[
+    //printf("b\n");
+    
     return rect;
 }
 
 
-Circle* JSONtoCircle(const char* svgString) {
+Circle* JSONtoCircle(char* svgString) {
+    //printf("\n\n\nNEW CIRCLE\n");
     Circle *circle = initializeCircle();
 
     if (svgString == NULL) return circle;
@@ -3248,9 +3282,8 @@ Circle* JSONtoCircle(const char* svgString) {
     subStr[end - start] = '\0';
     circle->cx = atof(subStr);
     cursor = end + 1; 
-    //printf("x = %f\n", rect->x);
+    //printf("x = %f\n", circle->cx);
 
-    
     //Find cy
     charStart = strchr(svgString + cursor, ':');  //+1 for the colon
     start = charStart - svgString;
@@ -3260,108 +3293,146 @@ Circle* JSONtoCircle(const char* svgString) {
     subStr[end - start] = '\0';
     circle->cy = atof(subStr);
     cursor = end + 1; 
-    //printf("y = %f\n", rect->y);
+    //printf("y = %f\n", circle->cy);
 
-    
     //Find r
     charStart = strchr(svgString + cursor, ':');  //+1 for the colon
     start = charStart - svgString;
-    charEnd = strchr(svgString + start + 1, ',');    //-1 for the comma 
+    charEnd = strchr(svgString + start, ',');    //-1 for the comma 
     end = charEnd - svgString;
-    strncpy(subStr, svgString + start + 1, end - start);
+    strncpy(subStr, svgString + start, end - start);
     subStr[end - start] = '\0';
     circle->r = atof(subStr);
     cursor = end + 1; 
-    //printf("width = %f\n", rect->width);
-
-    //Find num attributes
-    charStart = strchr(svgString + cursor, ':');  //+1 for the colon
-    start = charStart - svgString;
-    charEnd = strchr(svgString + start + 1, ',');    //-1 for the comma 
-    end = charEnd - svgString;
-    cursor = end + 1; 
-    //printf("height = %f\n", rect->height);
+    //printf("r = %f\n", circle->r);    
 
     //Find units
-    charStart = strchr(svgString + cursor, ':');  //+1 for the colon
-    start = charStart - svgString;
-    charEnd = strchr(svgString + start + 1, ',');    //-1 for the comma 
+    charStart = strstr(svgString + cursor, "units");  //+1 for the colon
+    //printf("Units start = %s\n", charStart);
+    start = 9 + charStart - svgString;
+    charEnd = strchr(svgString + start, '\'');    //-1 for the comma 
     end = charEnd - svgString;
-    strncpy(subStr, svgString + start + 1, end - start);
-    subStr[end - start] = '\0';
-    Attribute *atty = initializeAttribute("units", subStr);
-    insertBack(circle->otherAttributes, atty);
+    strncpy(subStr, svgString + start, end - start);
+    subStr[(end - start)] = '\0';
+    strcpy(circle->units, subStr);
+    cursor = end + 1;
+    //printf("units = %s\n", circle->units);
 
+    addAtributes(circle->otherAttributes, svgString + cursor + 15); //+15 for the length of attributes:[
+    
     return circle;
 }
 
 
-SVGimage* wholeJSONtoSVG(char *json, char *namespace, char *title, char *desc ) {
-    SVGimage *img = initializeSvgImage();
-    if (strcmp(json, "[]") == 0) return img;
+SVGimage* wholeJSONtoSVG(SVGimage *img, char *json, char *namespace, char *title, char *desc ) {
 
-    printf("JSON = %s\n\n", json);
+    //printf("Strlen(json) = %d\n", strlen(json));
+    /*printf("json = %s\n", json);
+    printf("ns = %s\n", namespace);
+    printf("title = %s\n", title);
+    printf("desc = %s\n", desc);
+    */
     
-    //Insert title, ns, and desc
+    //Format img
+    freeList(img->rectangles);
+    freeList(img->circles);
+
+    img->rectangles = initializeList( &rectangleToString, &deleteRectangle, &compareRectangles);
+    img->circles = initializeList( &circleToString, &deleteCircle, &compareCircles);
+    
     strcpy(img->namespace, namespace);
     strcpy(img->title, title);
     strcpy(img->description, desc);
-
-    char *charIndexOfCircle = strstr(json, "Circles");
-    int indexOfCircle = charIndexOfCircle - json;
+    
+    if (strcmp(json, "[]") == 0) return img;
+    //printf("A\n");
 
     //I know the rect data starts at index 15 so...
     if (json[15] != ']') {  //Has rects 
-
-        char *charEndIndex;
-        int endIndex;
         int currentIndex = 15;
-        char subStr[200];
-        while(true) {       //For rects
-            if (currentIndex >= indexOfCircle) break;
+        int brackets = 0;
+        int startIndex = 15; 
 
-            charEndIndex = strchr(json + currentIndex, '}');
-            
-            if (charEndIndex == NULL) break;
+        while(true) {
+            if (json[currentIndex] == '{' && brackets == 0) {
+                startIndex = currentIndex;
+                brackets -= 1;
 
-            endIndex = (charEndIndex - json) + 1;
+            } else if (json[currentIndex] == ']' && brackets == 0) {
+                break;
 
-            //printf("Len being copied = %d\n", endIndex - currentIndex);
+            } else if (json[currentIndex] == '{') {
+                brackets -= 1;
 
-            strncpy(subStr, json + currentIndex, endIndex - currentIndex);
-            subStr[endIndex - currentIndex] = '\0';
-            //insertBack(img->rectangles, JSONtoRect(subStr));
+            } else if (json[currentIndex] == '}') {
+                brackets += 1;
 
-            currentIndex = endIndex + 1;
+                if (brackets == 0) {
+                    char newRectangle[2 + currentIndex - startIndex];
+                    memcpy( newRectangle, json + startIndex, 1 + currentIndex - startIndex);
+                    newRectangle[1 + currentIndex - startIndex] = '\0';
+
+                    //printf("1\n");
+                    Rectangle *r = JSONtoRect(newRectangle);
+                   // printf("2\n");
+                    //printf("rects x val = '%f'\n", r->x);
+                    insertBack(img->rectangles, r);
+                    //printf("3\n");
+                }
+            }
+
+            currentIndex++;
         }
     }
 
+
+    //Get the circle data
+    char *charIndexOfCircle = strstr(json, "Circles");
+    int indexOfCircle = charIndexOfCircle - json;
+
+    int currentIndex = indexOfCircle + 11;   //+9 for the length of 'circle,'
+    int brackets = 0;
+    int startIndex =  currentIndex; 
+    //printf("B\n");
+    //printf("SpecialINdex = %c\n", json[currentIndex]);
+
+    if (json[currentIndex] != ']') {  //Has circles 
+        //printf("INSIDE\n");
+        while(true) {
+            if (json[currentIndex] == '{' && brackets == 0) {
+                startIndex = currentIndex;
+                brackets -= 1;
+
+            } else if (json[currentIndex] == ']' && brackets == 0) {
+                break;
+
+            } else if (json[currentIndex] == '{') {
+                brackets -= 1;
+
+            } else if (json[currentIndex] == '}') {
+                brackets += 1;
+
+                if (brackets == 0) {
+                    char newCircle[2 + currentIndex - startIndex];
+                    memcpy( newCircle, json + startIndex, 1 + currentIndex - startIndex);
+                    newCircle[1 + currentIndex - startIndex] = '\0';
+
+                    //printf("------------------Circle will be %s\n", newCircle);
+
+                    Circle *circle = JSONtoCircle(newCircle);
+
+                    //printf("before circle insert\n");
+                    insertBack(img->circles, circle);
+                    //printf("AFTER circle insert\n");
+                }
+            }
+
+            currentIndex++;
+        }
+    }
     
-    //For the circles
-    char *charEndIndex;
-    int endIndex;
-    int currentIndex = indexOfCircle + 10;
-    char subStr[200];
-    if (json[currentIndex] == ']') return img;
-
-    while(true) {       //For cirles
-        if (currentIndex >= indexOfCircle) break;
-
-        charEndIndex = strchr(json + currentIndex, '}');
-        
-        if (charEndIndex == NULL) break;
-
-        endIndex = (charEndIndex - json) + 1;
-
-        //printf("Len being copied = %d\n", endIndex - currentIndex);
-
-        strncpy(subStr, json + currentIndex, endIndex - currentIndex);
-        subStr[endIndex - currentIndex] = '\0';
-        insertBack(img->circles, JSONtoCircle(subStr));
-
-        currentIndex = endIndex + 1;
-    };  
-    
+    //printf("OUTSIDE\n");
+    ///("C\n");
     return img;
 }
 
@@ -3392,7 +3463,7 @@ char* getPathsToJSON(SVGimage *img) {
 
     List* list = getPaths(img);
 
-    char *jsonStr = (char*) malloc(sizeof(char) * 5000);   //For the '['
+    char *jsonStr = (char*) malloc(sizeof(char) * 100000);   //For the '['
     strcpy(jsonStr, "[");
 
     Path *path;
@@ -3423,3 +3494,52 @@ char* getPathsToJSON(SVGimage *img) {
     return jsonStr;
 }
 
+void addAtributes( List *attributes, char *json) {
+    if (strlen(json) < 10) return;
+
+    int startIndex = 0;
+    //printf("The input string = %s\n", json);
+    while(true) {
+
+        //Get the name
+        char *nameStart = strchr(json + startIndex, '\'');
+        int nameStartIndex = (int)(nameStart - json) + 9;
+        //printf("name start index = %d\n", nameStartIndex);
+
+        char *nameEnd = strchr(json + nameStartIndex, '\'');
+        int nameEndIndex = (int)(nameEnd - json);
+        //printf("name end index = %d\n", nameEndIndex);
+        
+        char name[1 + nameEndIndex - nameStartIndex];
+        strncpy(name, json + nameStartIndex, nameEndIndex - nameStartIndex);
+        name[nameEndIndex - nameStartIndex] = '\0';
+        //printf("Name made, name = %s\n", name);
+
+        //Get the value
+        char *valueStart = strchr(json + nameEndIndex + 10 , '\'');
+        //printf("value start = %s\n", valueStart);
+        int valueStartIndex = (int)( 1 + valueStart - json);
+        //printf("value start index = %d\n", valueStartIndex);
+
+        char *valueEnd = strchr(json + valueStartIndex + 1, '\'');
+        int valueEndIndex = (int)(valueEnd - json);
+        //printf("value end index = %d\n", valueEndIndex);
+        
+        char value[1 + valueEndIndex - valueStartIndex];
+        strncpy(value, json + valueStartIndex, valueEndIndex - valueStartIndex);
+        value[ valueEndIndex - valueStartIndex] = '\0';
+        //printf("value made, name = %s\n", value);
+
+        //printf("---------------\n");
+        //printf("name = %s\n", name);
+        //printf("value = %s\n", value);
+
+        insertBack(attributes, initializeAttribute(name, value));
+        //printf("inserted\n");
+        
+        //printf("Value being checked = %c\n", json[valueEndIndex + 2] );
+        if (json[valueEndIndex + 2] == ']') return;
+
+        startIndex = valueEndIndex+1;
+    }
+}
